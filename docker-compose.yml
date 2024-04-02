@@ -1,0 +1,62 @@
+version: '3'
+
+secrets:
+  my_secret:
+    file: ./my_secrets.txt
+
+
+networks:
+  network:
+    external: false
+services:
+  app:
+    image: abuia/ikt206g24v06:latest
+    container_name: production
+    depends_on:
+      - db
+    networks:
+      - network
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=db;Database=my_db;Username=my_user;Password=my_password"
+    secrets:
+      - my_secret
+    labels:
+      - com.centurylinklabs.watchtower.scope=ikt206g24v
+  db:
+    image: postgres:13.14-alpine3.19
+    networks:
+      - network
+    volumes:
+      - ~/apps/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: my_password
+      POSTGRES_USER: my_user
+      POSTGRES_DB: my_db
+
+  caddy:
+    image: caddy:latest
+    container_name: proxy
+    restart: always
+    networks:
+      - network
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - app
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/site:/srv
+      - ./caddy/caddy_data:/data
+      - ./caddy/caddy_config:/config
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    command: --scope ikt206g24v --interval 30
+
+volumes:
+  caddy_data:
+    external: true
+  caddy_config:
